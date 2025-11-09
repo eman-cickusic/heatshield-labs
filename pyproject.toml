@@ -1,7 +1,13 @@
 [tool.black]
 line-length = 100
 target-version = ["py311"]
-exclude = [".venv", "build", "dist"]
+exclude = """
+/(
+    \.venv
+  | build
+  | dist
+)/
+"""
 
 [tool.ruff]
 line-length = 100
@@ -13,4 +19,3 @@ ignore = [
   "F401",  # imported but unused (tests may import fixtures)
   "F841",  # unused variables (allow in tests)
 ]
-
