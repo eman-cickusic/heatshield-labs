@@ -138,6 +138,8 @@ graph LR
 - `HEATSHIELD_API` env var lets the UI target remote APIs without editing code.
 - Scenario simulator inside each plan card. Adjust hydration cadence, shift outdoor blocks, and add supports to see an immediate diff against the baseline plan.
 - Judge dashboard page aggregates provenance (ERA5/OpenAQ source, planner status, AI assistants) and provides a pipeline timeline for quick demos.
+- Slack/SMS automation buttons piggyback on `/automation/send`, so once you drop in a webhook you can push comms kits directly into Slack or Twilio.
+- Multi-day policy simulator runs a 3–5 day demo outlook and charts peak WBGT vs orange/red hours for quick rehearsal.
 
 ## Endpoints
 
@@ -145,6 +147,15 @@ graph LR
 - `POST /risk` body: `{ "schools": [...], "date": "YYYY-MM-DD", "use_demo": true|false }`
 - `POST /plan` body: `{ "risk_report": {...}, "mode": "rule"|"llm", "language": "English", "user_prompt": "..." }`
 - `POST /explain` body: `{ "summary": {...} }`
+- `POST /assistant` / `/communications` / `/qa/upload` / `/automation/send` power the copilot, comms kit, QA dashboard, and webhook integrations.
+
+### Optional automation webhooks
+
+Add any of these env vars if you want the “Send to Slack/SMS” buttons to hit real endpoints:
+
+- `HEATSHIELD_SLACK_WEBHOOK`
+- `HEATSHIELD_TWILIO_WEBHOOK`
+- `HEATSHIELD_EMAIL_WEBHOOK`
 
 ## Limitations & Ethics
 

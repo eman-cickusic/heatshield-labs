@@ -1,6 +1,8 @@
 import logging
+import os
 from collections import Counter
-from fastapi import FastAPI
+import requests
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 from typing import List, Optional
 
@@ -59,6 +61,19 @@ class CommunicationsRequest(BaseModel):
 
 class QARequest(BaseModel):
     schools: List[School]
+
+
+class AutomationRequest(BaseModel):
+    channel: str = Field(..., description="slack|sms|email")
+    payload: str = Field(..., description="Message body to dispatch.")
+    school: Optional[str] = None
+
+
+AUTOMATION_WEBHOOKS = {
+    "slack": os.getenv("HEATSHIELD_SLACK_WEBHOOK"),
+    "sms": os.getenv("HEATSHIELD_TWILIO_WEBHOOK"),
+    "email": os.getenv("HEATSHIELD_EMAIL_WEBHOOK"),
+}
 
 
 @app.get("/health")
@@ -259,4 +274,27 @@ async def qa_upload(req: QARequest):
         **analysis,
         "issue_count": len(analysis["issues"]),
         "llm": llm_notes,
+    }
+
+
+@app.post("/automation/send")
+async def automation_send(req: AutomationRequest):
+    channel = req.channel.lower()
+    message = req.payload.strip()
+    if not message:
+        raise HTTPException(status_code=400, detail="payload must not be empty")
+    webhook = AUTOMATION_WEBHOOKS.get(channel)
+    delivered = False
+    if webhook:
+        try:
+            requests.post(webhook, json={"text": message}, timeout=10)
+            delivered = True
+        except requests.exceptions.RequestException:
+            LOGGER.warning("Failed to deliver automation message to %s", channel)
+    else:
+        LOGGER.info("Automation webhook for %s not configured. Message logged only.", channel)
+    return {
+        "channel": channel,
+        "delivered": delivered,
+        "school": req.school,
     }

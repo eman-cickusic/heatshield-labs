@@ -264,6 +264,29 @@ def _pdf_write_multiline(pdf: "FPDF", text: str, line_height: float = 6.0) -> No
                 pdf.multi_cell(width, line_height, char, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
 
 
+def _format_time_label(value: Optional[str]) -> str:
+    if not value:
+        return "n/a"
+    try:
+        return pd.to_datetime(value).strftime("%b %d · %I:%M %p")
+    except Exception:
+        return str(value)
+
+
+def _dispatch_automation(channel: str, message: str, school: str) -> tuple[bool, str]:
+    try:
+        resp = requests.post(
+            f"{API}/automation/send",
+            json={"channel": channel, "payload": message, "school": school},
+            timeout=30,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        return data.get("delivered", False), ""
+    except requests.exceptions.RequestException as exc:
+        return False, str(exc)
+
+
 def _step_heading(step_id: str, aria_label: str, title: str) -> None:
     st.markdown(
         f"""
@@ -280,6 +303,8 @@ st.sidebar.markdown("[1 - Schools](#step-1)")
 st.sidebar.markdown("[2 - Planner](#step-2)")
 st.sidebar.markdown("[3 - Results](#step-3)")
 st.sidebar.markdown("[4 - Map](#step-4)")
+st.sidebar.markdown("[5 - Outlook](#step-5)")
+st.sidebar.markdown("[6 - Judge](#step-6)")
 
 st.title("Plan tomorrow's school day with live heat and air-quality risks")
 st.caption(
@@ -485,6 +510,24 @@ with st.container():
                     "Red + orange hours", tiers.get("red", 0) + tiers.get("orange", 0)
                 )
                 metrics[2].metric("Source", sources.get("met_source", "demo"))
+                insights_cols = st.columns(3)
+                insights_cols[0].metric(
+                    "Hottest hour", _format_time_label(summary.get("hottest_time"))
+                )
+                pm_peak = summary.get("pm_peak")
+                insights_cols[1].metric(
+                    "PM2.5 peak (µg/m³)",
+                    f"{pm_peak:.0f}" if pm_peak is not None else "n/a",
+                    delta="Smoke alert" if summary.get("pm_alert") else "",
+                )
+                insights_cols[2].metric(
+                    "Avg wind (m/s)",
+                    f"{summary.get('avg_wind', 0):.1f}" if summary.get("avg_wind") else "n/a",
+                )
+                st.caption(
+                    f"Median RH: {summary.get('median_rh', 'n/a')} · Orange/red hours: "
+                    f"{summary.get('orange_red_hours', 0)}"
+                )
 
                 with st.expander("See raw summary data"):
                     st.json(summary)
@@ -580,6 +623,37 @@ with st.container():
                                     disabled=True,
                                 )
                         st.caption(f"Source: {cached_kit.get('source', 'template')}")
+                        dispatcher = st.columns(2)
+                        default_payload = (
+                            channels.get("email")
+                            or channels.get("sms")
+                            or channels.get("pa")
+                            or f"HeatShield update for {school['name']}: follow safety plan."
+                        )
+                        if dispatcher[0].button(
+                            "Send to Slack",
+                            key=f"dispatch-slack-{kit_key}",
+                            use_container_width=True,
+                        ):
+                            delivered, err = _dispatch_automation(
+                                "slack", default_payload, school["name"]
+                            )
+                            if delivered:
+                                st.success("Sent to Slack webhook.", icon="✅")
+                            else:
+                                st.error(f"Slack dispatch failed: {err or 'no webhook configured'}")
+                        if dispatcher[1].button(
+                            "Send SMS alert",
+                            key=f"dispatch-sms-{kit_key}",
+                            use_container_width=True,
+                        ):
+                            delivered, err = _dispatch_automation(
+                                "sms", channels.get("sms", default_payload), school["name"]
+                            )
+                            if delivered:
+                                st.success("SMS webhook triggered.", icon="📲")
+                            else:
+                                st.error(f"SMS dispatch failed: {err or 'no webhook configured'}")
 
                 with st.expander("Scenario simulator", expanded=False):
                     st.caption(
@@ -754,6 +828,7 @@ if school_entries:
         st.toast("Copilot response ready. Scroll down to continue the chat.")
     st.markdown("</section>", unsafe_allow_html=True)
 
+
 _step_heading("step-4", "Map of tiers", "Step 4 - Map of worst daily tiers")
 
 with st.container():
@@ -764,71 +839,153 @@ with st.container():
         worst = next(
             (t for t in ["red", "orange", "yellow", "green"] if tiers.get(t, 0) > 0), "green"
         )
+        summary = item.get("summary", {})
         map_rows.append(
             {
                 "name": item["school"]["name"],
                 "lat": item["school"]["lat"],
                 "lon": item["school"]["lon"],
                 "tier": worst,
+                "peak_wbgt": summary.get("peak_wbgt_c"),
+                "pm_peak": summary.get("pm_peak"),
+                "pm_alert": summary.get("pm_alert", False),
+                "orange_red_hours": summary.get("orange_red_hours", 0),
             }
         )
 
     with placeholder_map.container():
+        filter_cols = st.columns([2, 1, 1])
+        tier_filter = filter_cols[0].multiselect(
+            "Show tiers on map",
+            ["green", "yellow", "orange", "red"],
+            default=["green", "yellow", "orange", "red"],
+        )
+        pm_only = filter_cols[1].checkbox("Highlight smoke alerts", value=False)
+        base_radius = filter_cols[2].slider("Marker size", 5000, 30000, 14000, step=1000)
         if map_rows:
             dfm = pd.DataFrame(map_rows)
-            colors = {
-                "green": [34, 139, 34],
-                "yellow": [255, 215, 0],
-                "orange": [255, 140, 0],
-                "red": [220, 20, 60],
-            }
-            dfm["color"] = dfm["tier"].map(colors)
-            midpoint = [float(dfm["lat"].mean()), float(dfm["lon"].mean())]
-            layer = pdk.Layer(
-                "ScatterplotLayer",
-                data=dfm,
-                get_position="[lon, lat]",
-                get_fill_color="color",
-                get_line_color=[0, 0, 0],
-                radius_min_pixels=6,
-                radius_max_pixels=30,
-                get_radius=20000,
-                pickable=True,
-            )
-            view_state = pdk.ViewState(latitude=midpoint[0], longitude=midpoint[1], zoom=4)
-            try:
-                st.pydeck_chart(
-                    pdk.Deck(
-                        layers=[layer],
-                        initial_view_state=view_state,
-                        tooltip={"text": "{name}\nWorst tier: {tier}"},
-                        height=420,
+            if tier_filter:
+                dfm = dfm[dfm["tier"].isin(tier_filter)]
+            if pm_only:
+                dfm = dfm[dfm["pm_alert"]]
+            if dfm.empty:
+                st.info("No campuses match the current filters.")
+            else:
+                colors = {
+                    "green": [34, 139, 34],
+                    "yellow": [255, 215, 0],
+                    "orange": [255, 140, 0],
+                    "red": [220, 20, 60],
+                }
+                tier_scale = {"green": 0.6, "yellow": 0.8, "orange": 1.0, "red": 1.3}
+                dfm["color"] = dfm["tier"].map(colors)
+                dfm["radius"] = (
+                    base_radius
+                    * dfm["tier"].map(tier_scale).fillna(1.0)
+                    * dfm["pm_alert"].map(lambda x: 1.4 if x else 1.0)
+                )
+                dfm["tooltip"] = dfm.apply(
+                    lambda row: (
+                        f"{row['name']}\n"
+                        f"Worst tier: {row['tier']}\n"
+                        f"Peak WBGT: {row.get('peak_wbgt','n/a')}\n"
+                        f"PM alert: {'Yes' if row.get('pm_alert') else 'No'}"
+                    ),
+                    axis=1,
+                )
+                midpoint = [float(dfm["lat"].mean()), float(dfm["lon"].mean())]
+                layer = pdk.Layer(
+                    "ScatterplotLayer",
+                    data=dfm,
+                    get_position="[lon, lat]",
+                    get_fill_color="color",
+                    get_line_color=[0, 0, 0],
+                    radius_min_pixels=6,
+                    radius_max_pixels=40,
+                    get_radius="radius",
+                    pickable=True,
+                )
+                view_state = pdk.ViewState(latitude=midpoint[0], longitude=midpoint[1], zoom=4)
+                try:
+                    st.pydeck_chart(
+                        pdk.Deck(
+                            layers=[layer],
+                            initial_view_state=view_state,
+                            tooltip={"text": "{tooltip}"},
+                            height=420,
+                        )
                     )
+                except Exception as exc:
+                    st.warning(
+                        f"Map failed to render: {exc}. Refer to the textual summary below.",
+                        icon="🗺️",
+                    )
+                legend_cols = st.columns(4)
+                for idx, tier in enumerate(["green", "yellow", "orange", "red"]):
+                    legend_cols[idx].markdown(
+                        f"<div style='display:flex;align-items:center;font-size:0.85rem;'>"
+                        f"<span style='width:16px;height:16px;background-color:rgb{tuple(colors[tier])};"
+                        f"display:inline-block;margin-right:6px;border-radius:50%;'></span>{tier.title()}</div>",
+                        unsafe_allow_html=True,
+                    )
+                tier_counts = dfm["tier"].value_counts()
+                summary_text = ", ".join(f"{tier}:{count}" for tier, count in tier_counts.items())
+                st.caption(
+                    f"{len(dfm)} schools plotted. Tier distribution – {summary_text}. "
+                    "Alt description: each marker is a school colored by its worst WBGT tier."
                 )
-            except Exception as exc:
-                st.warning(
-                    f"Map failed to render: {exc}. Refer to the textual summary below.", icon="⚠️"
-                )
-            legend_cols = st.columns(4)
-            for idx, tier in enumerate(["green", "yellow", "orange", "red"]):
-                legend_cols[idx].markdown(
-                    f"<div style='display:flex;align-items:center;font-size:0.85rem;'>"
-                    f"<span style='width:16px;height:16px;background-color:rgb{tuple(colors[tier])};"
-                    f"display:inline-block;margin-right:6px;border-radius:50%;'></span>{tier.title()}</div>",
-                    unsafe_allow_html=True,
-                )
-            tier_counts = dfm["tier"].value_counts()
-            summary_text = ", ".join(f"{tier}:{count}" for tier, count in tier_counts.items())
-            st.caption(
-                f"{len(map_rows)} schools plotted. Tier distribution – {summary_text}. "
-                "Alt description: each marker is a school colored by its worst WBGT tier."
-            )
         else:
             st.info("Generate a plan to populate the map.")
-
 st.markdown("</section>", unsafe_allow_html=True)
 
-_step_heading("step-5", "Judge dashboard", "Step 5 - Judge dashboard & provenance")
+_step_heading("step-5", "Multi-day outlook", "Step 5 - Policy simulator & outlook")
+with st.container():
+    st.subheader("3-day outlook")
+    st.caption("Run a short horizon using demo data to stress-test policies.")
+    with st.form("outlook-form"):
+        outlook_start = st.date_input("Outlook start date", selected_date)
+        horizon = st.slider("Days to simulate", min_value=2, max_value=5, value=3)
+        force_demo = st.checkbox(
+            "Force demo mode for outlook",
+            value=not use_demo,
+            help="Live mode is slow for multi-day runs; demo keeps it snappy for judges.",
+        )
+        outlook_submit = st.form_submit_button("Generate outlook")
+    if outlook_submit:
+        outlook_records = []
+        base_school = schools_df.iloc[0].to_dict()
+        for offset in range(horizon):
+            day = outlook_start + timedelta(days=offset)
+            payload = {
+                "schools": [base_school],
+                "date": day.strftime("%Y-%m-%d"),
+                "use_demo": force_demo or use_demo,
+            }
+            try:
+                resp = requests.post(f"{API}/risk", json=payload, timeout=RISK_TIMEOUT)
+                resp.raise_for_status()
+                data = resp.json()
+                summary = data["results"][0]["summary"]
+                outlook_records.append(
+                    {
+                        "date": payload["date"],
+                        "peak_wbgt_c": summary.get("peak_wbgt_c"),
+                        "orange_red_hours": summary.get("orange_red_hours", 0),
+                        "pm_alert": "Yes" if summary.get("pm_alert") else "No",
+                    }
+                )
+            except requests.exceptions.RequestException as exc:
+                st.error(f"Outlook failed for {payload['date']}: {exc}")
+                break
+        if outlook_records:
+            outlook_df = pd.DataFrame(outlook_records)
+            st.dataframe(outlook_df, use_container_width=True)
+            chart_df = outlook_df.set_index("date")[["peak_wbgt_c", "orange_red_hours"]]
+            st.line_chart(chart_df)
+        else:
+            st.info("No outlook data generated yet.")
+
+_step_heading("step-6", "Judge dashboard", "Step 6 - Judge dashboard & provenance")
 st.markdown(
     "<section class='glass-panel' role='region' aria-label='Judge dashboard'>",
     unsafe_allow_html=True,
