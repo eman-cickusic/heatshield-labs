@@ -32,6 +32,8 @@ if "assistant_history" not in st.session_state:
     st.session_state["assistant_history"] = {}
 if "comm_kit_cache" not in st.session_state:
     st.session_state["comm_kit_cache"] = {}
+if "pending_comm" not in st.session_state:
+    st.session_state["pending_comm"] = None
 
 st.set_page_config(page_title="HeatShield", layout="wide")
 st.markdown(
@@ -522,6 +524,33 @@ with st.container():
 
                 kit_cache = st.session_state["comm_kit_cache"]
                 kit_key = f"{school['name']}|{date}"
+
+                def _generate_comm_kit():
+                    try:
+                        kit_resp = requests.post(
+                            f"{API}/communications",
+                            json={
+                                "summary": summary,
+                                "school_name": school["name"],
+                                "language": language,
+                            },
+                            timeout=90,
+                        )
+                        kit_resp.raise_for_status()
+                        kit_cache[kit_key] = kit_resp.json()
+                        st.toast(f"Communications kit ready for {school['name'] or 'this school'}.")
+                    except requests.exceptions.RequestException as exc:
+                        st.error(f"Could not generate communications kit: {exc}")
+                    finally:
+                        st.session_state["pending_comm"] = None
+
+                if (
+                    st.session_state.get("pending_comm") == kit_key
+                    and kit_cache.get(kit_key) is None
+                ):
+                    with st.spinner("Drafting communications kit..."):
+                        _generate_comm_kit()
+
                 cached_kit = kit_cache.get(kit_key)
                 with st.expander("Communications kit", expanded=bool(cached_kit)):
                     if not cached_kit:
@@ -531,26 +560,8 @@ with st.container():
                             key=f"kit-btn-{kit_key}",
                             use_container_width=True,
                         ):
-                            with st.spinner("Drafting communications kit..."):
-                                try:
-                                    kit_resp = requests.post(
-                                        f"{API}/communications",
-                                        json={
-                                            "summary": summary,
-                                            "school_name": school["name"],
-                                            "language": language,
-                                        },
-                                        timeout=90,
-                                    )
-                                    kit_resp.raise_for_status()
-                                    cached_kit = kit_resp.json()
-                                    kit_cache[kit_key] = cached_kit
-                                except requests.exceptions.RequestException as exc:
-                                    st.error(f"Could not generate communications kit: {exc}")
-                                else:
-                                    st.toast(
-                                        f"Communications kit ready for {school['name'] or 'this school'}."
-                                    )
+                            st.session_state["pending_comm"] = kit_key
+                            st.experimental_rerun()
                     if cached_kit:
                         st.success("Draft ready to copy.")
                         channels = cached_kit.get("channels", {})
@@ -633,7 +644,16 @@ if school_entries:
     st.subheader("HeatShield Copilot")
     st.caption("Ask natural-language questions about any school plan.")
     labels = [entry["label"] for entry in school_entries]
-    selected_label = st.selectbox("Focus on", labels, key="assistant-select")
+    if (
+        "assistant_select" not in st.session_state
+        or st.session_state["assistant_select"] not in labels
+    ):
+        st.session_state["assistant_select"] = labels[0]
+    selected_label = st.selectbox(
+        "Focus on",
+        labels,
+        key="assistant_select",
+    )
     selected_entry = next(entry for entry in school_entries if entry["label"] == selected_label)
     chat_key = f"{selected_label}|{date}"
     history = st.session_state["assistant_history"].setdefault(chat_key, [])
