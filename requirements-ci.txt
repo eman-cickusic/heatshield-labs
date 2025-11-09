@@ -1,0 +1,9 @@
+pytest
+ruff
+black
+fastapi
+httpx
+requests
+pydantic
+numpy
+pandas

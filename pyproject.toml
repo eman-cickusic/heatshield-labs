@@ -1,0 +1,16 @@
+[tool.black]
+line-length = 100
+target-version = ["py311"]
+exclude = [".venv", "build", "dist"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+exclude = [".venv", "build", "dist"]
+ignore = [
+  "E501",  # line too long (Black governs)
+  "E402",  # module level import not at top
+  "F401",  # imported but unused (tests may import fixtures)
+  "F841",  # unused variables (allow in tests)
+]
+

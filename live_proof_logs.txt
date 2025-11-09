@@ -1,0 +1,24 @@
+﻿
+api-1  | OpenAQ locations attempt failed (422): Client error '422 Unprocessable Entity' for url 
+'https://api.openaq.org/v3/locations?coordinates=34.0522%3B-118.2437&radius=25000&limit=3&order_by=distance'
+api-1  | OpenAQ locations attempt failed (422): Client error '422 Unprocessable Entity' for url 
+'https://api.openaq.org/v3/locations?coordinates=34.0522%2C-118.2437&radius=25000&limit=3&order_by=distance'
+api-1  | OpenAQ REST request failed near lat=34.052 lon=-118.244: Client error '410 Gone' for url 
+'https://api.openaq.org/v2/measurements?parameter=pm25&coordinates=34.0522%2C-118.2437&date_from=2024-07-01T00%3A00%3A00&date_to=2024-07-01T23%3A59%3A59&radius=25000&limit=1000&sort=asc'
+api-1  | OpenAQ REST fallback also empty near lat=34.052 lon=-118.244 on 2024-07-01.
+api-1  | OpenAQ locations attempt failed (422): Client error '422 Unprocessable Entity' for url 
+'https://api.openaq.org/v3/locations?coordinates=34.0522%3B-118.2437&radius=25000&limit=3&order_by=distance'
+api-1  | OpenAQ locations attempt failed (422): Client error '422 Unprocessable Entity' for url 
+'https://api.openaq.org/v3/locations?coordinates=34.0522%2C-118.2437&radius=25000&limit=3&order_by=distance'
+api-1  | OpenAQ REST request failed near lat=34.052 lon=-118.244: Client error '410 Gone' for url 
+'https://api.openaq.org/v2/measurements?parameter=pm25&coordinates=34.0522%2C-118.2437&date_from=2024-07-01T00%3A00%3A00&date_to=2024-07-01T23%3A59%3A59&radius=25000&limit=1000&sort=asc'
+api-1  | OpenAQ REST fallback also empty near lat=34.052 lon=-118.244 on 2024-07-01.
+api-1  | OpenAQ locations attempt failed (422): Client error '422 Unprocessable Entity' for url 
+'https://api.openaq.org/v3/locations?coordinates=34.0522%3B-118.2437&radius=25000&limit=3&order_by=distance'
+api-1  | OpenAQ locations attempt failed (422): Client error '422 Unprocessable Entity' for url 
+'https://api.openaq.org/v3/locations?coordinates=34.0522%2C-118.2437&radius=25000&limit=3&order_by=distance'
+api-1  | OpenAQ REST request failed near lat=34.052 lon=-118.244: Client error '410 Gone' for url 
+'https://api.openaq.org/v2/measurements?parameter=pm25&coordinates=34.0522%2C-118.2437&date_from=2024-07-01T00%3A00%3A00&date_to=2024-07-01T23%3A59%3A59&radius=25000&limit=1000&sort=asc'
+api-1  | OpenAQ REST fallback also empty near lat=34.052 lon=-118.244 on 2024-07-01.
+
+

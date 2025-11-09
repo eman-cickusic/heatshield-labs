@@ -1,0 +1,1 @@
+﻿{"date":"2024-07-01","results":[{"school":{"name":"Central","lat":34.0522,"lon":-118.2437},"summary":{"hours_by_tier":{"green":24},"peak_wbgt_c":23.203719788948426},"sources":{"met_source":"asdi-era5","aq_source":"none"}}],"units":{"temp_c":"Â°C","wbgt_c":"Â°C","pm25":"Âµg/mÂ³","rh":"0-1","wind_ms":"m/s","swdown":"W/mÂ²"}}
