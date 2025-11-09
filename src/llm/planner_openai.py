@@ -41,7 +41,7 @@ def llm_plan(day_summary: Dict, language: str = "English", user_prompt: Optional
             temperature=0.3,
         )
         text = resp.choices[0].message.content
-        lines = [l.strip("- ") for l in text.split("\n") if l.strip()]
+        lines = [line.strip("- ") for line in text.split("\n") if line.strip()]
         return lines[:8]
     except Exception:
         return []
