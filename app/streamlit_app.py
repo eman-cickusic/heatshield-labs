@@ -547,6 +547,10 @@ with st.container():
                                     kit_cache[kit_key] = cached_kit
                                 except requests.exceptions.RequestException as exc:
                                     st.error(f"Could not generate communications kit: {exc}")
+                                else:
+                                    st.toast(
+                                        f"Communications kit ready for {school['name'] or 'this school'}."
+                                    )
                     if cached_kit:
                         st.success("Draft ready to copy.")
                         channels = cached_kit.get("channels", {})
@@ -660,6 +664,7 @@ if school_entries:
                     reply_text = f"Assistant unavailable: {exc}"
                 st.markdown(reply_text or "No response available.")
         history.append({"role": "assistant", "content": reply_text or "No response available."})
+        st.toast("Copilot response ready. Scroll down to continue the chat.")
     st.markdown("</section>", unsafe_allow_html=True)
 
 _step_heading("step-4", "Map of tiers", "Step 4 - Map of worst daily tiers")
