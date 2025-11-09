@@ -136,6 +136,8 @@ graph LR
 - Planner mode toggle (`rule` vs `llm`), language select (English, Spanish, French, Portuguese, Haitian Creole), optional instruction box, and a live/demo data toggle.
 - Downloadable PDF per school and a Pydeck map colored by the worst WBGT/PM tier.
 - `HEATSHIELD_API` env var lets the UI target remote APIs without editing code.
+- Scenario simulator inside each plan card. Adjust hydration cadence, shift outdoor blocks, and add supports to see an immediate diff against the baseline plan.
+- Judge dashboard page aggregates provenance (ERA5/OpenAQ source, planner status, AI assistants) and provides a pipeline timeline for quick demos.
 
 ## Endpoints
 

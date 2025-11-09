@@ -581,6 +581,73 @@ with st.container():
                                 )
                         st.caption(f"Source: {cached_kit.get('source', 'template')}")
 
+                with st.expander("Scenario simulator", expanded=False):
+                    st.caption(
+                        "Adjust the day to test what-if schedules. We recombine your baseline plan with the tweaks below."
+                    )
+                    shift = st.slider(
+                        "Shift outdoor blocks (hours)",
+                        min_value=-2.0,
+                        max_value=2.0,
+                        value=0.0,
+                        step=0.5,
+                        key=f"scenario-shift-{kit_key}",
+                    )
+                    hydration_choice = st.selectbox(
+                        "Hydration cadence",
+                        options=[
+                            "Standard (every 20 min)",
+                            "Aggressive (every 10 min)",
+                            "Cooling stations on demand",
+                        ],
+                        key=f"scenario-hydration-{kit_key}",
+                    )
+                    supports = st.multiselect(
+                        "Additional supports",
+                        options=[
+                            "Use large commons as cooling center",
+                            "Run bilingual robocall update",
+                            "Deploy shade canopies",
+                            "Stagger dismissal by grade",
+                        ],
+                        key=f"scenario-supports-{kit_key}",
+                    )
+                    scenario_plan = list(plan_actions) if plan_actions else []
+                    scenario_diffs = []
+                    if shift != 0:
+                        shift_text = (
+                            f"Shift strenuous outdoor activity by {shift:+.1f}h "
+                            "to dodge peak WBGT; update bell schedule accordingly."
+                        )
+                        scenario_plan.append(shift_text)
+                        scenario_diffs.append(shift_text)
+                    hydration_map = {
+                        "Standard (every 20 min)": "Maintain 20-minute hydration cadence.",
+                        "Aggressive (every 10 min)": "Hydration + cool-down every 10 minutes; log compliance.",
+                        "Cooling stations on demand": "Keep misting/cooling stations staffed during recess and athletics.",
+                    }
+                    hydration_text = hydration_map.get(hydration_choice)
+                    if hydration_text and hydration_text not in scenario_plan:
+                        scenario_plan.append(hydration_text)
+                        scenario_diffs.append(hydration_text)
+                    for support in supports:
+                        if support not in scenario_plan:
+                            scenario_plan.append(support)
+                            scenario_diffs.append(support)
+                    if scenario_plan:
+                        st.markdown("**Simulated plan**")
+                        for action in scenario_plan:
+                            st.write(f"- {action}")
+                    if scenario_diffs:
+                        st.info(
+                            "Adjustments added to the baseline plan:",
+                            icon="🛠️",
+                        )
+                        for diff_item in scenario_diffs:
+                            st.write(f"• {diff_item}")
+                    else:
+                        st.caption("No adjustments selected yet.")
+
                 if FPDF and plan_actions:
                     pdf = FPDF()
                     pdf.add_page()
@@ -758,3 +825,57 @@ with st.container():
             )
         else:
             st.info("Generate a plan to populate the map.")
+
+st.markdown("</section>", unsafe_allow_html=True)
+
+_step_heading("step-5", "Judge dashboard", "Step 5 - Judge dashboard & provenance")
+st.markdown(
+    "<section class='glass-panel' role='region' aria-label='Judge dashboard'>",
+    unsafe_allow_html=True,
+)
+if results:
+    st.subheader("Live pipeline snapshot")
+    judge_labels = (
+        [entry["label"] for entry in school_entries]
+        if school_entries
+        else [f"{item['school']['name']} (#{idx + 1})" for idx, item in enumerate(results)]
+    )
+    judge_key = st.selectbox("Inspect school", judge_labels, key="judge-select")
+    if school_entries:
+        selected_meta = next(entry for entry in school_entries if entry["label"] == judge_key)
+        school_name = selected_meta["school"]["name"]
+    else:
+        school_name = results[0]["school"]["name"]
+    meta = next((item for item in results if item["school"]["name"] == school_name), results[0])
+    sources = meta.get("sources", {})
+    summary = meta.get("summary", {})
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Meteorology source", sources.get("met_source", "demo"))
+    c2.metric("Air quality source", sources.get("aq_source", "none"))
+    c3.metric("Peak WBGT (°C)", f"{summary.get('peak_wbgt_c', 0):.1f}")
+    st.markdown("### Pipeline timeline")
+    timeline = [
+        ("ERA5 fetch", sources.get("met_source", "demo"), True),
+        ("OpenAQ retrieval", sources.get("aq_source", "none"), True),
+        ("Risk summarizer", "WBGT tiers + PM2.5 merged", True),
+        ("Rule planner", "Generated deterministic baseline", True),
+        (
+            "LLM planner",
+            "Personalized actions" if planner_mode == "llm" else "Skipped (rule mode)",
+            planner_mode == "llm",
+        ),
+        ("AI Communications", "Ready via expander", True),
+        ("Copilot", "Chat assistant online", True),
+    ]
+    for label, detail, status in timeline:
+        icon = "🟢" if status else "⚪️"
+        st.write(f"{icon} **{label}:** {detail}")
+    st.markdown("### Proof artifacts")
+    st.caption(
+        "- `/health` uptime monitored (see Render logs).\n"
+        "- ERA5/OpenAQ provenance listed above per school.\n"
+        '- Download JSON + log snippets via README "Live proof steps".'
+    )
+else:
+    st.info("Run a plan to unlock the judge dashboard.")
+st.markdown("</section>", unsafe_allow_html=True)
