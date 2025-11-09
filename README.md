@@ -36,6 +36,27 @@ docker compose up --build
 
 This launches the API on `localhost:8000` and Streamlit UI on `localhost:8501`. The UI container targets the API via `HEATSHIELD_API=http://api:8000`.
 
+## Hosted demo
+
+- Streamlit Cloud UI: **https://heatshield-labs.streamlit.app**
+- The UI expects the API to be reachable via a Cloudflare quick tunnel. Keep these two terminals open during live demos:
+
+```powershell
+# Terminal 1: stack
+cd C:\Users\cicku\Desktop\competition
+docker compose up --build
+
+# Terminal 2: tunnel (http2 avoids UDP blocks on some networks)
+"& 'C:\Program Files (x86)\cloudflared\cloudflared.exe'" `
+  tunnel --protocol http2 --no-autoupdate `
+  --url http://127.0.0.1:8000
+```
+
+Cloudflared prints a `https://<name>.trycloudflare.com` URL. Paste that value into the Streamlit app secrets (`HEATSHIELD_API`). Test with:
+
+- `Invoke-WebRequest <url>/health -UseBasicParsing`
+- `https://<url>/docs` in the browser
+
 ## Live vs. Demo data
 
 - The UI exposes a **Data source** toggle. `Demo` uses deterministic synthetic ERA5-like weather + clean PM2.5; `Live` pulls directly from ASDI ERA5 and OpenAQ S3 for the requested lat/lon/date.
