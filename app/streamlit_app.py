@@ -21,6 +21,7 @@ except Exception:
 def _read_csv(uploaded_file):
     return pd.read_csv(uploaded_file)
 
+
 API = os.getenv("HEATSHIELD_API", "http://localhost:8000").rstrip("/")
 LANG_CHOICES = ["English", "Spanish", "French", "Portuguese", "Haitian Creole"]
 RISK_TIMEOUT = int(os.getenv("HEATSHIELD_RISK_TIMEOUT", "1800"))
@@ -236,6 +237,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+
 def _pdf_safe(text: str) -> str:
     return text.encode("latin-1", "replace").decode("latin-1")
 
@@ -315,7 +317,9 @@ with st.container():
             "Tip: run a single school in Live mode first to prove connectivity. Demo mode is instant and great for judges.",
             icon="💡",
         )
-        st.caption("Keyboard: focus the uploader and press Enter/Space to open the file dialog; Esc cancels.")
+        st.caption(
+            "Keyboard: focus the uploader and press Enter/Space to open the file dialog; Esc cancels."
+        )
 
 _step_heading("step-2", "Planner controls", "Step 2 - Configure planner")
 
@@ -380,8 +384,14 @@ if submitted:
         )
     else:
         st.session_state["is_running"] = True
-        payload = {"schools": schools_df.to_dict(orient="records"), "date": date, "use_demo": use_demo}
-        with st.spinner("Fetching ERA5/OpenAQ data…" if not use_demo else "Generating deterministic plan…"):
+        payload = {
+            "schools": schools_df.to_dict(orient="records"),
+            "date": date,
+            "use_demo": use_demo,
+        }
+        with st.spinner(
+            "Fetching ERA5/OpenAQ data…" if not use_demo else "Generating deterministic plan…"
+        ):
             try:
                 risk_resp = requests.post(f"{API}/risk", json=payload, timeout=RISK_TIMEOUT)
                 risk_resp.raise_for_status()
@@ -389,7 +399,9 @@ if submitted:
                 units = response_json.get("units", {})
                 results = response_json.get("results", [])
             except requests.exceptions.ReadTimeout:
-                error_message = "Live data pull exceeded the timeout. Try fewer schools or stay in Demo."
+                error_message = (
+                    "Live data pull exceeded the timeout. Try fewer schools or stay in Demo."
+                )
             except requests.exceptions.RequestException as exc:
                 error_message = f"Risk request failed: {exc}"
             finally:
@@ -426,12 +438,14 @@ with st.container():
                 st.markdown(f"#### {school['name']}")
                 metrics = st.columns(3)
                 metrics[0].metric("Peak WBGT (°C)", f"{summary.get('peak_wbgt_c', 0):.1f}")
-                metrics[1].metric("Red + orange hours", tiers.get("red", 0) + tiers.get("orange", 0))
+                metrics[1].metric(
+                    "Red + orange hours", tiers.get("red", 0) + tiers.get("orange", 0)
+                )
                 metrics[2].metric("Source", sources.get("met_source", "demo"))
-    
+
                 with st.expander("See raw summary data"):
                     st.json(summary)
-    
+
                 plan_payload = {
                     "risk_report": summary,
                     "mode": planner_mode,
@@ -445,7 +459,7 @@ with st.container():
                     plan_actions = plan_resp.json().get("actions", [])
                 except requests.exceptions.RequestException as exc:
                     st.error(f"Planner request failed: {exc}")
-    
+
                 st.markdown("**Plan**")
                 if plan_actions:
                     for action in plan_actions:
@@ -455,19 +469,27 @@ with st.container():
                         st.caption("Awaiting planner response…")
                     else:
                         st.info("No actions returned. Try rule mode or verify summary data.")
-    
+
                 try:
-                    explain_resp = requests.post(f"{API}/explain", json={"summary": summary}, timeout=30)
+                    explain_resp = requests.post(
+                        f"{API}/explain", json={"summary": summary}, timeout=30
+                    )
                     if explain_resp.status_code == 200:
                         st.caption(explain_resp.json().get("text", ""))
                 except requests.exceptions.RequestException:
                     st.caption("Explain service unavailable.")
-    
+
                 if FPDF and plan_actions:
                     pdf = FPDF()
                     pdf.add_page()
                     pdf.set_font("Helvetica", size=14)
-                    pdf.cell(0, 10, _pdf_safe(f"HeatShield Plan - {school['name']} ({date})"), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+                    pdf.cell(
+                        0,
+                        10,
+                        _pdf_safe(f"HeatShield Plan - {school['name']} ({date})"),
+                        new_x=XPos.LMARGIN,
+                        new_y=YPos.NEXT,
+                    )
                     pdf.set_font("Helvetica", size=11)
                     pdf.cell(0, 8, _pdf_safe("Summary:"), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
                     for tier_name in ["green", "yellow", "orange", "red"]:
@@ -491,7 +513,11 @@ with st.container():
                     for i, action in enumerate(plan_actions, 1):
                         _pdf_write_multiline(pdf, f"{i}. {action}")
                     raw_pdf = pdf.output(dest="S")
-                    buffer = BytesIO(bytes(raw_pdf) if isinstance(raw_pdf, bytearray) else raw_pdf.encode("latin-1"))
+                    buffer = BytesIO(
+                        bytes(raw_pdf)
+                        if isinstance(raw_pdf, bytearray)
+                        else raw_pdf.encode("latin-1")
+                    )
                     download_clicked = st.download_button(
                         label=f"Download plan for {school['name']}",
                         data=buffer,
@@ -504,7 +530,9 @@ with st.container():
 
     else:
         with placeholder_cards:
-            st.info('No plans yet. Configure the planner and click "Generate today\'s safety plan".')
+            st.info(
+                'No plans yet. Configure the planner and click "Generate today\'s safety plan".'
+            )
 
 _step_heading("step-4", "Map of tiers", "Step 4 - Map of worst daily tiers")
 
@@ -513,7 +541,9 @@ with st.container():
     map_rows = []
     for item in results:
         tiers = item.get("summary", {}).get("hours_by_tier", {})
-        worst = next((t for t in ["red", "orange", "yellow", "green"] if tiers.get(t, 0) > 0), "green")
+        worst = next(
+            (t for t in ["red", "orange", "yellow", "green"] if tiers.get(t, 0) > 0), "green"
+        )
         map_rows.append(
             {
                 "name": item["school"]["name"],
@@ -522,7 +552,7 @@ with st.container():
                 "tier": worst,
             }
         )
-    
+
     with placeholder_map.container():
         if map_rows:
             dfm = pd.DataFrame(map_rows)
@@ -556,7 +586,9 @@ with st.container():
                     )
                 )
             except Exception as exc:
-                st.warning(f"Map failed to render: {exc}. Refer to the textual summary below.", icon="⚠️")
+                st.warning(
+                    f"Map failed to render: {exc}. Refer to the textual summary below.", icon="⚠️"
+                )
             legend_cols = st.columns(4)
             for idx, tier in enumerate(["green", "yellow", "orange", "red"]):
                 legend_cols[idx].markdown(

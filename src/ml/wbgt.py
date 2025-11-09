@@ -13,11 +13,19 @@ def dewpoint_c(temp_c: float, rh: float) -> float:
     return (b * gamma) / (a - gamma)
 
 
-def wbgt_from_met(temp_c: np.ndarray, rh: np.ndarray, glob_rad: np.ndarray, wind_ms: np.ndarray) -> np.ndarray:
+def wbgt_from_met(
+    temp_c: np.ndarray, rh: np.ndarray, glob_rad: np.ndarray, wind_ms: np.ndarray
+) -> np.ndarray:
     # crude globe temp proxy via shortwave;
     tg = temp_c + 0.02 * glob_rad / (wind_ms + 1e-6)
     # natural wet-bulb approximation
-    tw = temp_c * np.arctan(0.151977 * np.sqrt(rh * 100 + 8.313659)) + np.arctan(temp_c + rh) - np.arctan(rh - 1.676331) + 0.00391838 * (rh) ** (3 / 2) * np.arctan(0.023101 * rh) - 4.686035
+    tw = (
+        temp_c * np.arctan(0.151977 * np.sqrt(rh * 100 + 8.313659))
+        + np.arctan(temp_c + rh)
+        - np.arctan(rh - 1.676331)
+        + 0.00391838 * (rh) ** (3 / 2) * np.arctan(0.023101 * rh)
+        - 4.686035
+    )
     # final WBGT (outdoor, shade)
     wbgt = 0.7 * tw + 0.2 * tg + 0.1 * temp_c
     return wbgt
@@ -51,7 +59,7 @@ def wbgt_liljegren_from_met(
         t * np.arctan(0.151977 * np.sqrt(rh_pct + 8.313659))
         + np.arctan(t + rh_pct)
         - np.arctan(rh_pct - 1.676331)
-        + 0.00391838 * (rh_pct ** 1.5) * np.arctan(0.023101 * rh_pct)
+        + 0.00391838 * (rh_pct**1.5) * np.arctan(0.023101 * rh_pct)
         - 4.686035
     )
 
@@ -79,8 +87,18 @@ def risk_tiers(wbgt_c: np.ndarray, pm25: np.ndarray) -> pd.Series:
     # WBGT (C): <27 green, 27-30 yellow, 30-32 orange, >32 red
     # PM2.5 (µg/m3): <12 good, 12-35 moderate, 35-55 unhealthy-sens, >55 unhealthy
     t1, t2, t3 = _wbgt_thresholds_from_env()
-    wb = pd.cut(wbgt_c, bins=[-100, t1, t2, t3, 100], labels=["green", "yellow", "orange", "red"], right=False)
-    pm = pd.cut(pm25, bins=[-1, 12, 35, 55, 1e6], labels=["good", "moderate", "unhealthy-sens", "unhealthy"], right=False)
+    wb = pd.cut(
+        wbgt_c,
+        bins=[-100, t1, t2, t3, 100],
+        labels=["green", "yellow", "orange", "red"],
+        right=False,
+    )
+    pm = pd.cut(
+        pm25,
+        bins=[-1, 12, 35, 55, 1e6],
+        labels=["good", "moderate", "unhealthy-sens", "unhealthy"],
+        right=False,
+    )
     # combine: worst of the two
     tier_order = {"green": 0, "yellow": 1, "orange": 2, "red": 3}
     pm_map = {"good": 0, "moderate": 1, "unhealthy-sens": 2, "unhealthy": 3}

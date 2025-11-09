@@ -1,5 +1,6 @@
 import sys
 from pathlib import Path
+
 # Add project root to sys.path so we can import src.* packages
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 

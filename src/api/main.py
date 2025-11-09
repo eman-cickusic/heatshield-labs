@@ -76,7 +76,9 @@ async def risk(req: RiskRequest):
             met["pm25"] = met["pm25"].interpolate().fillna(method="bfill").fillna(method="ffill")
         df = compute_risk(met)
         summary = summarize_day(df)
-        met_source = getattr(met, "attrs", {}).get("met_source", ("demo" if req.use_demo else "asdi-era5"))
+        met_source = getattr(met, "attrs", {}).get(
+            "met_source", ("demo" if req.use_demo else "asdi-era5")
+        )
         outputs.append(
             {
                 "school": s.model_dump(),
@@ -121,17 +123,23 @@ def _explain_text(summary: dict) -> str:
     ]
     worst = next((tier for tier, _, _ in ordered if hours.get(tier, 0) > 0), "green")
     parts = []
-    parts.append(f"WBGT thresholds set at {t1:.1f}/{t2:.1f}/{t3:.1f} degC (green/yellow/orange/red).")
+    parts.append(
+        f"WBGT thresholds set at {t1:.1f}/{t2:.1f}/{t3:.1f} degC (green/yellow/orange/red)."
+    )
     parts.append(
         "Reported hours by tier: "
         + ", ".join([f"{k}={hours.get(k,0)}" for k in ["green", "yellow", "orange", "red"]])
         + "."
     )
     if peak is not None:
-        parts.append(f"Peak WBGT reached {peak:.1f} degC, driving {worst} guidance during hotter periods.")
+        parts.append(
+            f"Peak WBGT reached {peak:.1f} degC, driving {worst} guidance during hotter periods."
+        )
     else:
         parts.append(f"Peak WBGT unavailable; guidance based on tier distribution (worst={worst}).")
-    parts.append("The final plan is aligned to the worst daily tier to ensure safety and operational simplicity.")
+    parts.append(
+        "The final plan is aligned to the worst daily tier to ensure safety and operational simplicity."
+    )
     return " ".join(parts)
 
 

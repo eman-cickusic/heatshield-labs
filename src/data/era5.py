@@ -60,18 +60,15 @@ def fetch_era5_hourly(lat: float, lon: float, date: str, force_demo: bool = Fals
         fs = _get_filesystem()
         lon_mod = _to_360(lon)
         analysis = _load_analysis_fields(fs, lat, lon_mod, start, end)
-        swdown = _load_swdown_flux(fs, lat, lon_mod, start - pd.Timedelta(hours=12), end + pd.Timedelta(hours=12))
+        swdown = _load_swdown_flux(
+            fs, lat, lon_mod, start - pd.Timedelta(hours=12), end + pd.Timedelta(hours=12)
+        )
         df = analysis.copy()
         df["temp_c"] = df["temp_k"] - 273.15
         df["dew_c"] = df["dew_k"] - 273.15
         df["rh"] = _relative_humidity(df["temp_c"], df["dew_c"])
         df["wind_ms"] = np.hypot(df["u10"], df["v10"])
-        df["swdown"] = (
-            swdown.reindex(df.index)
-            .interpolate(method="time")
-            .bfill()
-            .ffill()
-        )
+        df["swdown"] = swdown.reindex(df.index).interpolate(method="time").bfill().ffill()
         final = df[["temp_c", "rh", "wind_ms", "swdown"]].copy()
         final.reset_index(inplace=True)
         final.rename(columns={"index": "time"}, inplace=True)

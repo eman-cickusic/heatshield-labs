@@ -22,11 +22,14 @@ def _system_prompt(language: str) -> str:
     )
 
 
-def llm_plan(day_summary: Dict, language: str = "English", user_prompt: Optional[str] = None) -> List[str]:
+def llm_plan(
+    day_summary: Dict, language: str = "English", user_prompt: Optional[str] = None
+) -> List[str]:
     if not OPENAI_API_KEY:
         return []
     try:
         from openai import OpenAI
+
         client = OpenAI(api_key=OPENAI_API_KEY)
         extra = ""
         if user_prompt:

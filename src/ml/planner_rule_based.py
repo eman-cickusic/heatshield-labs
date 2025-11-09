@@ -7,18 +7,18 @@ BASE_ACTIONS = {
     "yellow": [
         "Move PE to early periods or indoor shaded spaces.",
         "Increase water breaks (every 20 minutes).",
-        "Use classrooms on lower floors if available."
+        "Use classrooms on lower floors if available.",
     ],
     "orange": [
         "Cancel strenuous outdoor activities; switch to low-exertion indoor alternatives.",
         "Shorten recess; provide shaded/indoor options.",
-        "Activate HEPA/portable filters if PM2.5 > 35."
+        "Activate HEPA/portable filters if PM2.5 > 35.",
     ],
     "red": [
         "Suspend outdoor activities; move assemblies online or staggered indoors.",
         "Masks recommended if PM2.5 > 55; prioritize rooms with best ventilation.",
-        "Notify families of heat/smoke precautions."
-    ]
+        "Notify families of heat/smoke precautions.",
+    ],
 }
 
 

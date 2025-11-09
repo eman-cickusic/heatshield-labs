@@ -51,7 +51,9 @@ def fetch_pm25(lat: float, lon: float, date: str) -> pd.DataFrame:
         return pd.DataFrame()
 
 
-def _nearest_location_ids(lat: float, lon: float, radius_m: int = 25000, limit: int = 3) -> List[int]:
+def _nearest_location_ids(
+    lat: float, lon: float, radius_m: int = 25000, limit: int = 3
+) -> List[int]:
     """Resolve nearest OpenAQ location IDs using v3 API.
 
     Tries semicolon and comma coordinate separators with minimal params.
@@ -71,7 +73,9 @@ def _nearest_location_ids(lat: float, lon: float, radius_m: int = 25000, limit: 
             if ids:
                 return ids
         except httpx.HTTPStatusError as exc:
-            LOGGER.warning("OpenAQ locations attempt failed (%s): %s", exc.response.status_code, exc)
+            LOGGER.warning(
+                "OpenAQ locations attempt failed (%s): %s", exc.response.status_code, exc
+            )
         except Exception as exc:
             LOGGER.warning("OpenAQ locations attempt error: %s", exc)
     return []
@@ -90,7 +94,9 @@ def fetch_pm25_s3(lat: float, lon: float, date: str) -> pd.DataFrame:
     ymd = f"{year}{month:02d}{day:02d}"
     ids = _nearest_location_ids(lat, lon)
     if not ids:
-        LOGGER.info("No OpenAQ location IDs found within search radius near lat=%.3f lon=%.3f.", lat, lon)
+        LOGGER.info(
+            "No OpenAQ location IDs found within search radius near lat=%.3f lon=%.3f.", lat, lon
+        )
         return pd.DataFrame()
     fs = s3fs.S3FileSystem(anon=True)
     for loc_id in ids:
@@ -101,7 +107,7 @@ def fetch_pm25_s3(lat: float, lon: float, date: str) -> pd.DataFrame:
         try:
             with fs.open(path, "rb") as f:
                 df = pd.read_csv(f, compression="gzip")
-            df = df[df["parameter"] == "pm25"][ ["datetime", "value"] ].copy()
+            df = df[df["parameter"] == "pm25"][["datetime", "value"]].copy()
             if df.empty:
                 continue
             df["time"] = pd.to_datetime(df["datetime"], utc=True).dt.tz_convert(None)
