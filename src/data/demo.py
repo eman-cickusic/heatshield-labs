@@ -8,8 +8,16 @@ from datetime import datetime, timedelta
 def synthetic_hourly_series(date: str):
     dt0 = datetime.fromisoformat(date)
     hours = pd.date_range(dt0, dt0 + timedelta(hours=23), freq="h")
-    tmax, tmin = 38.0, 24.0  # Celsius
-    # Sinusoidal temp profile
+    month = dt0.month
+    # Basic seasonal scaling (southern US baseline)
+    if month in (12, 1, 2):
+        tmax, tmin = 18.0, 8.0
+    elif month in (3, 4, 5):
+        tmax, tmin = 28.0, 16.0
+    elif month in (6, 7, 8):
+        tmax, tmin = 38.0, 24.0
+    else:
+        tmax, tmin = 30.0, 18.0
     temp = (tmax + tmin) / 2 + ((tmax - tmin) / 2) * np.sin((hours.hour - 6) / 24 * 2 * np.pi)
     rh = 0.55 + 0.15 * np.sin((hours.hour) / 24 * 2 * np.pi)
     wind = 2.0 + 1.0 * np.cos((hours.hour) / 24 * 2 * np.pi)
