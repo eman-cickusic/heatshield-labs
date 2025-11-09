@@ -28,6 +28,10 @@ RISK_TIMEOUT = int(os.getenv("HEATSHIELD_RISK_TIMEOUT", "1800"))
 
 if "is_running" not in st.session_state:
     st.session_state["is_running"] = False
+if "assistant_history" not in st.session_state:
+    st.session_state["assistant_history"] = {}
+if "comm_kit_cache" not in st.session_state:
+    st.session_state["comm_kit_cache"] = {}
 
 st.set_page_config(page_title="HeatShield", layout="wide")
 st.markdown(
@@ -309,8 +313,42 @@ with st.container():
     if not ((schools_df["lat"].between(-90, 90)) & (schools_df["lon"].between(-180, 180))).all():
         st.error("Latitude must be [-90,90] and longitude [-180,180].")
 
-    st.success(f"{len(schools_df)} schools loaded.", icon="✅")
-    st.dataframe(schools_df, use_container_width=True)
+st.success(f"{len(schools_df)} schools loaded.", icon="✅")
+st.dataframe(schools_df, use_container_width=True)
+
+qa_feedback = None
+qa_error = None
+try:
+    qa_payload = {"schools": schools_df[["name", "lat", "lon"]].to_dict(orient="records")}
+    qa_resp = requests.post(f"{API}/qa/upload", json=qa_payload, timeout=25)
+    if qa_resp.status_code == 200:
+        qa_feedback = qa_resp.json()
+    else:
+        qa_error = f"status {qa_resp.status_code}"
+except requests.exceptions.RequestException as exc:
+    qa_error = str(exc)
+
+qa_area = st.expander("AI QA review", expanded=bool(qa_feedback and qa_feedback.get("issue_count")))
+with qa_area:
+    if qa_feedback:
+        issue_count = qa_feedback.get("issue_count", 0)
+        score = qa_feedback.get("score", 0)
+        if issue_count == 0:
+            st.success(f"No blocking issues detected. QA score: {score}/100.", icon="✅")
+        else:
+            st.warning(
+                f"{issue_count} potential issue(s) detected. QA score: {score}/100.",
+                icon="⚠️",
+            )
+            for idx, issue in enumerate(qa_feedback.get("issues", []), start=1):
+                severity = issue.get("severity", "info").title()
+                st.write(f"{idx}. **{severity}** — {issue.get('message')}")
+        if qa_feedback.get("llm"):
+            st.caption(qa_feedback["llm"])
+    elif qa_error:
+        st.caption(f"AI QA temporarily unavailable ({qa_error}).")
+    else:
+        st.caption("QA results will appear once the API responds.")
 
     with col_help:
         st.info(
@@ -425,13 +463,16 @@ if st.session_state["is_running"] and not results and not error_message:
 
 _step_heading("step-3", "Results and plans", "Step 3 - Review summaries & plans")
 
+school_entries: list[dict] = []
 with st.container():
     if results:
-        for item in results:
+        for idx, item in enumerate(results):
             school = item["school"]
             summary = item.get("summary", {})
             sources = item.get("sources", {})
             tiers = summary.get("hours_by_tier", {})
+            entry_label = f"{school['name']} (#{idx + 1})"
+            school_entries.append({"label": entry_label, "summary": summary, "school": school})
             card = st.container()
             with card:
                 st.markdown("<div class='plan-card'>", unsafe_allow_html=True)
@@ -478,6 +519,48 @@ with st.container():
                         st.caption(explain_resp.json().get("text", ""))
                 except requests.exceptions.RequestException:
                     st.caption("Explain service unavailable.")
+
+                kit_cache = st.session_state["comm_kit_cache"]
+                kit_key = f"{school['name']}|{date}"
+                with st.expander("Communications kit", expanded=False):
+                    cached_kit = kit_cache.get(kit_key)
+                    if not cached_kit:
+                        if st.button(
+                            f"Draft comms for {school['name']}", key=f"kit-btn-{kit_key}"
+                        ):
+                            with st.spinner("Drafting communications kit..."):
+                                try:
+                                    kit_resp = requests.post(
+                                        f"{API}/communications",
+                                        json={
+                                            "summary": summary,
+                                            "school_name": school["name"],
+                                            "language": language,
+                                        },
+                                        timeout=90,
+                                    )
+                                    kit_resp.raise_for_status()
+                                    cached_kit = kit_resp.json()
+                                    kit_cache[kit_key] = cached_kit
+                                except requests.exceptions.RequestException as exc:
+                                    st.error(f"Could not generate communications kit: {exc}")
+                    if cached_kit:
+                        channels = cached_kit.get("channels", {})
+                        for channel, label in [
+                            ("sms", "SMS / text blast"),
+                            ("email", "Email newsletter"),
+                            ("pa", "PA / morning announcement"),
+                        ]:
+                            content = channels.get(channel)
+                            if content:
+                                st.text_area(
+                                    label,
+                                    value=content,
+                                    height=80 if channel != "email" else 160,
+                                    key=f"{kit_key}-{channel}",
+                                    disabled=True,
+                                )
+                        st.caption(f"Source: {cached_kit.get('source', 'template')}")
 
                 if FPDF and plan_actions:
                     pdf = FPDF()
@@ -533,6 +616,47 @@ with st.container():
             st.info(
                 'No plans yet. Configure the planner and click "Generate today\'s safety plan".'
             )
+
+if school_entries:
+    st.markdown(
+        "<section class='glass-panel' role='region' aria-label='AI copilot'>",
+        unsafe_allow_html=True,
+    )
+    st.subheader("HeatShield Copilot")
+    st.caption("Ask natural-language questions about any school plan.")
+    labels = [entry["label"] for entry in school_entries]
+    selected_label = st.selectbox("Focus on", labels, key="assistant-select")
+    selected_entry = next(entry for entry in school_entries if entry["label"] == selected_label)
+    chat_key = f"{selected_label}|{date}"
+    history = st.session_state["assistant_history"].setdefault(chat_key, [])
+    for msg in history:
+        with st.chat_message(msg["role"]):
+            st.markdown(msg["content"])
+    user_prompt = st.chat_input("Ask the HeatShield Copilot")
+    if user_prompt:
+        history.append({"role": "user", "content": user_prompt})
+        with st.chat_message("user"):
+            st.markdown(user_prompt)
+        with st.chat_message("assistant"):
+            with st.spinner("Gathering insights..."):
+                reply_text = ""
+                try:
+                    assist_resp = requests.post(
+                        f"{API}/assistant",
+                        json={
+                            "summary": selected_entry["summary"],
+                            "question": user_prompt,
+                            "language": language,
+                        },
+                        timeout=90,
+                    )
+                    assist_resp.raise_for_status()
+                    reply_text = assist_resp.json().get("text", "")
+                except requests.exceptions.RequestException as exc:
+                    reply_text = f"Assistant unavailable: {exc}"
+                st.markdown(reply_text or "No response available.")
+        history.append({"role": "assistant", "content": reply_text or "No response available."})
+    st.markdown("</section>", unsafe_allow_html=True)
 
 _step_heading("step-4", "Map of tiers", "Step 4 - Map of worst daily tiers")
 

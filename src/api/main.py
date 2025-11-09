@@ -1,11 +1,17 @@
 import logging
+from collections import Counter
 from fastapi import FastAPI
 from pydantic import BaseModel, Field
 from typing import List, Optional
 
 from ..data.era5 import fetch_era5_hourly
 from ..data.openaq import fetch_pm25, fetch_pm25_s3
-from ..llm.planner_openai import llm_plan
+from ..llm.planner_openai import (
+    llm_plan,
+    llm_chat_response,
+    llm_comm_kit,
+    llm_qa_feedback,
+)
 from ..ml.planner_rule_based import plan_from_summary
 from ..ml.risk import compute_risk, summarize_day
 from ..ml.wbgt import _wbgt_thresholds_from_env
@@ -37,6 +43,22 @@ class PlanRequest(BaseModel):
 
 class ExplainRequest(BaseModel):
     summary: dict
+
+
+class AssistantRequest(BaseModel):
+    summary: dict
+    question: str
+    language: str = "English"
+
+
+class CommunicationsRequest(BaseModel):
+    summary: dict
+    school_name: Optional[str] = None
+    language: str = "English"
+
+
+class QARequest(BaseModel):
+    schools: List[School]
 
 
 @app.get("/health")
@@ -147,3 +169,90 @@ def _explain_text(summary: dict) -> str:
 async def explain(req: ExplainRequest):
     text = _explain_text(req.summary)
     return {"text": text}
+
+
+@app.post("/assistant")
+async def assistant(req: AssistantRequest):
+    ai_text = llm_chat_response(req.summary, req.question, req.language)
+    if ai_text:
+        return {"text": ai_text, "source": "llm"}
+    fallback = _explain_text(req.summary)
+    return {
+        "text": "LLM assistant unavailable. Latest summary instead:\n" + fallback,
+        "source": "fallback",
+    }
+
+
+@app.post("/communications")
+async def communications(req: CommunicationsRequest):
+    payload = llm_comm_kit(req.summary, req.language)
+    if payload:
+        return {"channels": payload, "source": "llm"}
+    default = _explain_text(req.summary)
+    sms = f"{req.school_name or 'This campus'} will follow heat safeguards today. Keep hydration, shade, and rest cycles active."
+    email = (
+        f"{req.school_name or 'Campus'} plan:\n{default}\n\n"
+        "Actions: keep water stations stocked, rotate outdoor blocks <15 minutes, notify families if afternoon athletics move indoors."
+    )
+    pa = "Reminder: heat plan is in effect. Rotate groups indoors, log hydration breaks, alert the office if anyone feels ill."
+    return {
+        "channels": {"sms": sms, "email": email, "pa": pa},
+        "source": "template",
+    }
+
+
+def _analyze_schools(schools: List[School]) -> dict:
+    issues = []
+    coord_map = {}
+    for idx, school in enumerate(schools):
+        row = school.model_dump()
+        name = row.get("name", "").strip() or f"Row {idx + 1}"
+        lat = row.get("lat")
+        lon = row.get("lon")
+        if lat is None or lon is None:
+            issues.append({"severity": "high", "message": f"{name} missing latitude/longitude."})
+            continue
+        if not (-90 <= lat <= 90):
+            issues.append({"severity": "high", "message": f"{name} latitude {lat} outside [-90, 90]."})
+        if not (-180 <= lon <= 180):
+            issues.append({"severity": "high", "message": f"{name} longitude {lon} outside [-180, 180]."})
+        key = (round(lat, 3), round(lon, 3))
+        coord_map.setdefault(key, []).append(name)
+    name_counts = Counter(s.name.strip() for s in schools if s.name.strip())
+    for school_name, count in name_counts.items():
+        if count > 1:
+            issues.append(
+                {
+                    "severity": "medium",
+                    "message": f"School '{school_name}' appears {count} times. Confirm duplicates are intended.",
+                }
+            )
+    for coord, items in coord_map.items():
+        if len(items) > 1:
+            sample = ", ".join(items[:5])
+            issues.append(
+                {
+                    "severity": "medium",
+                    "message": f"{len(items)} schools share coordinates {coord}: {sample}",
+                }
+            )
+    if len(schools) > 200:
+        issues.append(
+            {
+                "severity": "low",
+                "message": f"Large upload ({len(schools)} schools). Consider demo/testing in smaller batches for Live mode.",
+            }
+        )
+    score = max(0, 100 - len(issues) * 8)
+    return {"issues": issues, "score": score}
+
+
+@app.post("/qa/upload")
+async def qa_upload(req: QARequest):
+    analysis = _analyze_schools(req.schools)
+    llm_notes = llm_qa_feedback([issue["message"] for issue in analysis["issues"]])
+    return {
+        **analysis,
+        "issue_count": len(analysis["issues"]),
+        "llm": llm_notes,
+    }
