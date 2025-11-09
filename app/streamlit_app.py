@@ -522,10 +522,15 @@ with st.container():
 
                 kit_cache = st.session_state["comm_kit_cache"]
                 kit_key = f"{school['name']}|{date}"
-                with st.expander("Communications kit", expanded=False):
-                    cached_kit = kit_cache.get(kit_key)
+                cached_kit = kit_cache.get(kit_key)
+                with st.expander("Communications kit", expanded=bool(cached_kit)):
                     if not cached_kit:
-                        if st.button(f"Draft comms for {school['name']}", key=f"kit-btn-{kit_key}"):
+                        st.caption("Generate ready-to-send SMS/email/PA drafts for this school.")
+                        if st.button(
+                            f"Draft comms for {school['name']}",
+                            key=f"kit-btn-{kit_key}",
+                            use_container_width=True,
+                        ):
                             with st.spinner("Drafting communications kit..."):
                                 try:
                                     kit_resp = requests.post(
@@ -543,6 +548,7 @@ with st.container():
                                 except requests.exceptions.RequestException as exc:
                                     st.error(f"Could not generate communications kit: {exc}")
                     if cached_kit:
+                        st.success("Draft ready to copy.")
                         channels = cached_kit.get("channels", {})
                         for channel, label in [
                             ("sms", "SMS / text blast"),
