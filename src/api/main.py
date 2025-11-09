@@ -213,9 +213,13 @@ def _analyze_schools(schools: List[School]) -> dict:
             issues.append({"severity": "high", "message": f"{name} missing latitude/longitude."})
             continue
         if not (-90 <= lat <= 90):
-            issues.append({"severity": "high", "message": f"{name} latitude {lat} outside [-90, 90]."})
+            issues.append(
+                {"severity": "high", "message": f"{name} latitude {lat} outside [-90, 90]."}
+            )
         if not (-180 <= lon <= 180):
-            issues.append({"severity": "high", "message": f"{name} longitude {lon} outside [-180, 180]."})
+            issues.append(
+                {"severity": "high", "message": f"{name} longitude {lon} outside [-180, 180]."}
+            )
         key = (round(lat, 3), round(lon, 3))
         coord_map.setdefault(key, []).append(name)
     name_counts = Counter(s.name.strip() for s in schools if s.name.strip())

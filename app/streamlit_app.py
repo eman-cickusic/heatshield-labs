@@ -525,9 +525,7 @@ with st.container():
                 with st.expander("Communications kit", expanded=False):
                     cached_kit = kit_cache.get(kit_key)
                     if not cached_kit:
-                        if st.button(
-                            f"Draft comms for {school['name']}", key=f"kit-btn-{kit_key}"
-                        ):
+                        if st.button(f"Draft comms for {school['name']}", key=f"kit-btn-{kit_key}"):
                             with st.spinner("Drafting communications kit..."):
                                 try:
                                     kit_resp = requests.post(
