@@ -1,3 +1,5 @@
+<img src="assets/heatshield_logo.svg" alt="HeatShield Labs" width="420" />
+
 # HeatShield Schools – Local MVP
 
 **Goal:** Turn live ERA5 (via NOAA’s ASDI S3 mirror) and OpenAQ data into climate-adaptive school day plans.

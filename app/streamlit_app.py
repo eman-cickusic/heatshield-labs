@@ -36,7 +36,7 @@ if "comm_kit_cache" not in st.session_state:
 if "pending_comm" not in st.session_state:
     st.session_state["pending_comm"] = None
 
-st.set_page_config(page_title="HeatShield", layout="wide")
+st.set_page_config(page_title="HeatShield Labs", page_icon="assets/heatshield_mark.svg", layout="wide")
 st.markdown(
     """
     <style>

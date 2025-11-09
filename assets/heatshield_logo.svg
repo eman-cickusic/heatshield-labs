@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="180" viewBox="0 0 720 180">
+  <defs>
+    <linearGradient id="heat" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#FFB15A"/>
+      <stop offset="50%" stop-color="#FF7A00"/>
+      <stop offset="100%" stop-color="#FF3B30"/>
+    </linearGradient>
+  </defs>
+  <!-- Mark -->
+  <g transform="translate(12,12)">
+    <rect width="156" height="156" rx="28" fill="url(#heat)"/>
+    <g fill="#FFFFFF" transform="translate(0,0)">
+      <path d="M90 28c16 10 26 13 36 15v36c0 32-21 50-36 57-15-7-36-25-36-57V43c10-2 20-5 36-15z" opacity="0.9" transform="translate(-10,0) scale(1.15)"/>
+      <rect x="58" y="62" width="16" height="60" rx="7"/>
+      <rect x="96" y="62" width="16" height="60" rx="7"/>
+      <rect x="66" y="86" width="48" height="16" rx="8"/>
+    </g>
+  </g>
+  <!-- Wordmark -->
+  <g transform="translate(196,40)" fill="#0F172A">
+    <text x="0" y="52" font-size="52" font-weight="700" letter-spacing="0.5"
+      font-family="SF Pro Display, Inter, system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif">
+      HeatShield
+    </text>
+    <text x="0" y="110" font-size="34" font-weight="500" opacity="0.75"
+      font-family="SF Pro Text, Inter, system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif">
+      Labs
+    </text>
+  </g>
+</svg>
+
